@@ -1,0 +1,217 @@
+captainVersion: 4
+services:
+  $$cap_appname-redis-cache:
+    image: redis:latest
+    volumes:
+      - $$cap_appname-redis-cache-vol:/data
+    deploy:
+      restart_policy:
+        condition: on-failure
+    caproverExtra:
+      notExposeAsWebApp: 'true'
+
+  $$cap_appname-redis-queue:
+    image: redis:latest
+    volumes:
+      - $$cap_appname-redis-queue-vol:/data
+    deploy:
+      restart_policy:
+        condition: on-failure
+    caproverExtra:
+      notExposeAsWebApp: 'true'
+
+  $$cap_appname-redis-socketio:
+    image: redis:latest
+    volumes:
+      - $$cap_appname-redis-socketio-vol:/data
+    deploy:
+      restart_policy:
+        condition: on-failure
+    caproverExtra:
+      notExposeAsWebApp: 'true'
+
+  $$cap_appname:
+    image: frappe/erpnext-nginx:$$cap_erpnext_version
+    environment:
+      UPSTREAM_REAL_IP_ADDRESS: 10.0.0.0/8
+      FRAPPE_PY: srv-captain--$$cap_appname-erpnext-python
+      FRAPPE_PY_PORT: 8000
+      FRAPPE_SOCKETIO: srv-captain--$$cap_appname-frappe-socketio
+      SOCKETIO_PORT: 9000
+    volumes:
+      - $$cap_appname-sites-vol:/var/www/html/sites
+      - $$cap_appname-assets-vol:/assets
+    deploy:
+      restart_policy:
+        condition: on-failure
+    caproverExtra:      
+      containerHttpPort: '8080'
+
+  $$cap_appname-erpnext-python:    
+    deploy:
+      restart_policy:
+        condition: on-failure
+    environment:
+      MARIADB_HOST: $$cap_erp_db
+      MYSQL_ROOT_PASSWORD: $$cap_db_pass
+      REDIS_CACHE: srv-captain--$$cap_appname-redis-cache:6379
+      REDIS_QUEUE: srv-captain--$$cap_appname-redis-queue:6379
+      REDIS_SOCKETIO: srv-captain--$$cap_appname-redis-socketio:6379
+      SOCKETIO_PORT: 9000
+      AUTO_MIGRATE: 1
+    volumes:
+      - $$cap_appname-sites-vol:/home/frappe/frappe-bench/sites:rw
+      - $$cap_appname-assets-vol:/home/frappe/frappe-bench/sites/assets:rw
+    caproverExtra:
+      dockerfileLines:
+        - FROM frappe/erpnext-worker:$$cap_erpnext_version
+        - RUN chown -R frappe:frappe /home/frappe/frappe-bench/sites
+      notExposeAsWebApp: 'true'
+
+  $$cap_appname-frappe-socketio:    
+    deploy:
+      restart_policy:
+        condition: on-failure
+    environment:
+      REDIS_CACHE: srv-captain--$$cap_appname-redis-cache:6379
+      REDIS_QUEUE: srv-captain--$$cap_appname-redis-queue:6379
+      REDIS_SOCKETIO: srv-captain--$$cap_appname-redis-socketio:6379
+      SOCKETIO_PORT: 9000
+    volumes:
+      - $$cap_appname-sites-vol:/home/frappe/frappe-bench/sites:rw
+    caproverExtra:
+      dockerfileLines:
+        - FROM frappe/frappe-socketio:$$cap_frappe_version
+      notExposeAsWebApp: 'true'
+
+  $$cap_appname-erpnext-worker-default:    
+    deploy:
+      restart_policy:
+        condition: on-failure
+    command: worker
+    environment:
+      MARIADB_HOST: $$cap_erp_db      
+      REDIS_CACHE: srv-captain--$$cap_appname-redis-cache:6379
+      REDIS_QUEUE: srv-captain--$$cap_appname-redis-queue:6379
+      REDIS_SOCKETIO: srv-captain--$$cap_appname-redis-socketio:6379
+      SOCKETIO_PORT: 9000    
+    volumes:
+      - $$cap_appname-sites-vol:/home/frappe/frappe-bench/sites:rw
+    caproverExtra:
+      dockerfileLines:
+        - FROM frappe/erpnext-worker:$$cap_erpnext_version
+        - RUN chown -R frappe:frappe /home/frappe/frappe-bench/sites        
+      notExposeAsWebApp: 'true'
+
+  $$cap_appname-erpnext-worker-short:    
+    deploy:
+      restart_policy:
+        condition: on-failure
+    command: worker
+    environment:
+      WORKER_TYPE: short
+      MARIADB_HOST: $$cap_erp_db
+      MYSQL_ROOT_PASSWORD: $$cap_db_pass
+      REDIS_CACHE: srv-captain--$$cap_appname-redis-cache:6379
+      REDIS_QUEUE: srv-captain--$$cap_appname-redis-queue:6379
+      REDIS_SOCKETIO: srv-captain--$$cap_appname-redis-socketio:6379
+      SOCKETIO_PORT: 9000
+    volumes:
+      - $$cap_appname-sites-vol:/home/frappe/frappe-bench/sites:rw
+    caproverExtra:
+      dockerfileLines:
+        - FROM frappe/erpnext-worker:$$cap_erpnext_version
+        - RUN chown -R frappe:frappe /home/frappe/frappe-bench/sites        
+      notExposeAsWebApp: 'true'
+
+  $$cap_appname-erpnext-worker-long:
+    deploy:
+      restart_policy:
+        condition: on-failure    
+    command: worker
+    environment:
+      WORKER_TYPE: long
+      MARIADB_HOST: $$cap_erp_db
+      MYSQL_ROOT_PASSWORD: $$cap_db_pass
+      REDIS_CACHE: srv-captain--$$cap_appname-redis-cache:6379
+      REDIS_QUEUE: srv-captain--$$cap_appname-redis-queue:6379
+      REDIS_SOCKETIO: srv-captain--$$cap_appname-redis-socketio:6379
+      SOCKETIO_PORT: 9000
+    volumes:
+      - $$cap_appname-sites-vol:/home/frappe/frappe-bench/sites:rw
+    caproverExtra:
+      dockerfileLines:
+        - FROM frappe/erpnext-worker:$$cap_erpnext_version
+        - RUN chown -R frappe:frappe /home/frappe/frappe-bench/sites        
+      notExposeAsWebApp: 'true'  
+
+  $$cap_appname-frappe-schedule:  
+    deploy:
+      restart_policy:
+        condition: on-failure    
+    command: schedule
+    environment:
+      MARIADB_HOST: $$cap_erp_db
+      MYSQL_ROOT_PASSWORD: $$cap_db_pass
+      REDIS_CACHE: srv-captain--$$cap_appname-redis-cache:6379
+      REDIS_QUEUE: srv-captain--$$cap_appname-redis-queue:6379
+      REDIS_SOCKETIO: srv-captain--$$cap_appname-redis-socketio:6379
+      SOCKETIO_PORT: 9000
+    volumes:
+      - $$cap_appname-sites-vol:/home/frappe/frappe-bench/sites:rw
+    caproverExtra:
+      dockerfileLines:
+        - FROM frappe/erpnext-worker:$$cap_erpnext_version
+        - RUN chown -R frappe:frappe /home/frappe/frappe-bench/sites        
+      notExposeAsWebApp: 'true'
+
+  $$cap_appname-site-creator:    
+    restart: "no"
+    depends_on:
+      - $$cap_appname-erpnext-python
+    command: new
+    environment:
+      SITE_NAME: $$cap_site_name
+      DB_ROOT_USER: root
+      MYSQL_ROOT_PASSWORD: $$cap_db_paas
+      ADMIN_PASSWORD: $$cap_frappe_admin_password
+      INSTALL_APPS: $$cap_install_apps
+    volumes:
+      - $$cap_appname-sites-vol:/home/frappe/frappe-bench/sites:rw
+    caproverExtra:
+      dockerfileLines:
+        - FROM frappe/erpnext-worker:$$cap_erpnext_version
+        - RUN chown -R frappe:frappe /home/frappe/frappe-bench/sites        
+      notExposeAsWebApp: 'true'
+
+
+caproverOneClickApp:
+    variables:        
+        - id: $$cap_erpnext_version
+          label: ERPNext Version
+          description: Find it here https://github.com/frappe/erpnext/releases
+        - id: $$cap_frappe_version
+          label: Frappe version
+          description: Find it here https://github.com/frappe/frappe/releases
+        - id: $$cap_erp_db
+          label: Frappe Database
+          description: Master maria db for Frappe. eg. srv-captain--frappe-master-db
+        - id: $$cap_db_paas
+          label: Root Password of Mariadb
+          description: Master maria db's root password
+        - id: $$cap_site_name
+          label: ERP Site Name        
+        - id: $$cap_install_apps
+          label: Install apps
+          description: Install apps from list of frappe's default apps
+          defaultValue: erpnext
+        - id: $$cap_frappe_admin_password
+          label: Frappe Admin Password
+          defaultValue: admin
+    instructions:
+        start: 'ERPNext is a free and open-source integrated Enterprise Resource Planning (ERP) software developed by Frappe Technologies Pvt. Ltd.'
+        end: 'ERPNext has been successfully deployed. '
+    displayName: Frappe-ERPNext
+    isOfficial: false
+    description: ERPNext is a free and open-source integrated Enterprise Resource Planning (ERP) software developed by Frappe Technologies Pvt. Ltd.
+    documentation: Modified from https://github.com/frappe/frappe_docker/blob/main/docs/docker-swarm.md
